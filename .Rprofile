@@ -1,0 +1,5 @@
+source("renv/activate.R")
+library(here)
+library(tidyverse)
+library(igraph)
+library(duckplyr)
