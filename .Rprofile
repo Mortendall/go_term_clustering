@@ -1,5 +1,7 @@
 source("renv/activate.R")
 library(here)
+extrafont::loadfonts(device = "win")
 library(tidyverse)
 library(igraph)
 library(duckplyr)
+library(usethis)

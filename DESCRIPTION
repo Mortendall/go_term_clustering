@@ -2,6 +2,11 @@ Package: go_term_clustering
 Type: Project
 Version: 0.0.1
 Imports:
+    ggnetwork,
+    here,
+    igraph,
     knitr,
     rmarkdown
 Encoding: UTF-8
+Suggests: 
+    tidyverse

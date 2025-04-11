@@ -5,12 +5,21 @@
 
 # Load packages required to define the pipeline:
 library(targets)
+extrafont::loadfonts()
+library(tidyverse)
+library(here)
+library(ggraph)
+library(patchwork)
+
 # library(tarchetypes) # Load other packages as needed.
 
 # Set target options:
 tar_option_set(
-  packages = c("tibble")
+    packages = desc::desc_get_deps()$package[-1],
+    format = "rds"
 )
+
+options(clustermq.scheduler = "multiprocess")
 
 # Run the R scripts in the R/ folder with your custom functions:
 tar_source()
@@ -18,10 +27,69 @@ tar_source()
 
 # Replace the target list below with your own:
 list(
-  tar_target(
-
+  tar_target(name = gonetwork,
+             command = prepare_network()
   ),
-  tar_target(
+  tar_target(name = go_data_list_1,
+             command = data_list(here::here("data-raw/"),1, gonetwork)),
+  tar_target(name = subgraphs_1,
+             command = create_subgraphs(go_data_list_1,
+                                        gonetwork))
+   ,
+   tar_target(name = clusteringResults_1,
+              command = cluster_go_terms(subgraphs_1,
+                                         gonetwork,
+                                         go_data_list_1))
+   ,
+   tar_target(name = annotated_subgraphs_1,
+              command =prepare_plot(clusteringResults_1,
+                                    subgraphs_1)),
+  tar_target(name = plots_1,
+             command = make_plots(clusteringResults_1,
+                                  annotated_subgraphs_1))
+  ,
+  tar_target(name = go_data_list_2,
+             command = data_list(here::here("data-raw/"),2, gonetwork)),
+  tar_target(name = subgraphs_2,
+             command = create_subgraphs(go_data_list_2,
+                                        gonetwork))
+  ,
+  tar_target(name = clusteringResults_2,
+             command = cluster_go_terms(subgraphs_2,
+                                        gonetwork,
+                                        go_data_list_2))
+  ,
+  tar_target(name = annotated_subgraphs_2,
+             command =prepare_plot(clusteringResults_2,
+                                   subgraphs_2)),
+  tar_target(name = plots_2,
+             command = make_plots(clusteringResults_2,
+                                  annotated_subgraphs_2)),
+  tar_target(name = go_data_list_3,
+             command = data_list(here::here("data-raw/"),3, gonetwork)),
+  tar_target(name = subgraphs_3,
+             command = create_subgraphs(go_data_list_3,
+                                        gonetwork))
+  ,
+  tar_target(name = clusteringResults_3,
+             command = cluster_go_terms(subgraphs_3,
+                                        gonetwork,
+                                        go_data_list_3))
+  ,
+  tar_target(name = annotated_subgraphs_3,
+             command =prepare_plot(clusteringResults_3,
+                                   subgraphs_3)),
+  tar_target(name = plots_3,
+             command = make_plots(clusteringResults_3,
+                                  annotated_subgraphs_3)),
+  tar_target(name = print_plot_1,
+             command = print_figures(plots_1,
+                                     "Cold_vs_TN")),
+  tar_target(name = print_plot_2,
+             command = print_figures(plots_2,
+                                     "Acute_cold_TN")),
+  tar_target(name = print_plot_3,
+             command = print_figures(plots_3,
+                                     "Cold_TN_vs_TN"))
 
-  )
 )
