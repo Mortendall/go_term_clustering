@@ -79,6 +79,36 @@ create_subgraphs <- function(data_list,graphNet){
 
 }
 
+#' Add direction to clustering results
+#'
+#' @param clustering_result
+#' @param data_list
+#'
+#' @return a clustering list with added direction
+
+add_direction <- function(clustering_result, data_list){
+    direction <- purrr::map(data_list,~dplyr::select(.x, ID,
+                                                     Direction))
+
+    clustering_result <- purrr::map(clustering_result,
+                        ~dplyr::mutate(.x, order = dplyr::row_number()))
+
+    joined_clustering <- purrr::map2(clustering_result,
+                                     direction,
+                                     ~dplyr::left_join(.x, .y, by = c("ontoID"="ID"))
+    )
+    joined_clustering <- purrr::map(joined_clustering,
+                                    ~dplyr::mutate(.x, Direction =
+                                                       dplyr::case_when(
+                                                           is.na(Direction)~"non-significant",
+                                                           .default = Direction
+                                                       )) |>
+                                        dplyr::arrange(order) |>
+                                        dplyr::select(-order))
+    return(joined_clustering)
+
+}
+
 #' Cluster GO terms
 #'
 #' @param ontoNetSubgraph an igraph subgraph
@@ -151,6 +181,9 @@ cluster_go_terms <- function(ontoNetSubgraph, graphNet, significant_go_terms){
                                  .default = "#808080"
                              )))
 
+     ontoClust <- add_direction(ontoClust,
+                                significant_go_terms)
+
 
     return(ontoClust)
 
@@ -209,7 +242,14 @@ make_plots <- function(ontoClust, ontoNetSubgraph){
                                  ggraph::geom_edge_link0(width = 0.2, colour = "grey") +
                                  ggraph::geom_node_point(col = .y$color,
                                                          aes(fill = .y$clusterTerm),
-                                                         size = ifelse(.y$color=="#808080", 0,5)))
+                                                         size = ifelse(.y$color=="#808080", 0,5)
+                                                          # ,
+                                                          # shape = dplyr::case_when(
+                                                          #     .y$Direction == "Up"~ 24,
+                                                          #     .y$Direction == "Down"~25,
+                                                          #     .default = 21
+                                                          # )
+                                                         ))
 
     color_mismatch <- purrr::map2(color_guides,
                             ontoClust,~dplyr::filter(.y,
@@ -231,10 +271,16 @@ make_plots <- function(ontoClust, ontoNetSubgraph){
                                      name = "cluster",
                                      guide = "legend"
                                  )+
-                                 guides(fill = guide_legend(override.aes = list(size = 1, shape = 21)))+
+                                 guides(fill = guide_legend(override.aes = list(size = 5,
+                                                                                shape = 21)))+
                                  #ggraph::theme_graph(base_family = "Arial") +
                                  theme(legend.text = element_text(size = 12),
-                                       plot.background = element_blank()))
+                                       panel.background = element_rect(fill='transparent'),
+                                       panel.grid.major = element_blank(),
+                                       panel.grid.minor = element_blank(),
+                                       plot.background = element_rect(fill='transparent', color=NA),
+                                       legend.background = element_rect(fill='transparent')
+                                       ))
     plot_names <- names(plot_list)
     plot_list <- purrr::map2(plot_list,
                              plot_names,
