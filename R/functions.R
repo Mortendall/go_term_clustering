@@ -31,6 +31,7 @@ prepare_network <- function(){
 #' @return a list of files to read
 
 data_list <- function(folder,sheet_number, graphNet){
+
     file_list <- fs::dir_ls(folder,
                             regexp = ".xlsx$")
 
@@ -116,12 +117,12 @@ add_direction <- function(clustering_result, data_list){
 #'
 #' @return a list with results
 
-cluster_go_terms <- function(ontoNetSubgraph, graphNet, significant_go_terms){
+cluster_go_terms <- function(ontoNetSubgraph, graphNet, significant_go_terms, resolution){
     set.seed(429)
     ontoClustCommunity <- purrr::map(ontoNetSubgraph,
                                      ~ leidenAlg::find_partition(igraph::as_undirected(.x),
                                                                  edge_weights = rep(1, ecount(.x)),
-                                                                 resolution = .6) +1)
+                                                                 resolution = resolution) +1)
 
 
     ontoClust <- purrr::map2(ontoClustCommunity,
@@ -240,15 +241,16 @@ make_plots <- function(ontoClust, ontoNetSubgraph){
                              ontoClust,
                              ~ ggraph::ggraph(.x, layout = "nicely")+
                                  ggraph::geom_edge_link0(width = 0.2, colour = "grey") +
-                                 ggraph::geom_node_point(col = .y$color,
-                                                         aes(fill = .y$clusterTerm),
+                                 ggraph::geom_node_point(
+                                                         aes(fill = .y$clusterTerm,
+                                                             color = .y$clusterTerm),
                                                          size = ifelse(.y$color=="#808080", 0,5)
-                                                          # ,
-                                                          # shape = dplyr::case_when(
-                                                          #     .y$Direction == "Up"~ 24,
-                                                          #     .y$Direction == "Down"~25,
-                                                          #     .default = 21
-                                                          # )
+                                                           ,
+                                                           shape = dplyr::case_when(
+                                                               .y$Direction == "Up"~ 24,
+                                                               .y$Direction == "Down"~25,
+                                                               .default = 21
+                                                           )
                                                          ))
 
     color_mismatch <- purrr::map2(color_guides,
@@ -265,11 +267,10 @@ make_plots <- function(ontoClust, ontoNetSubgraph){
     plot_list <- purrr::map2(plot_list,
                              color_guides,
                              ~.x +
-                                 scale_fill_manual(
+                                 scale_color_manual(
                                      values = .y$color,
-                                     labels = .y$clusterTerm,
                                      name = "cluster",
-                                     guide = "legend"
+                                     aesthetics = c("color", "fill")
                                  )+
                                  guides(fill = guide_legend(override.aes = list(size = 5,
                                                                                 shape = 21)))+
@@ -324,4 +325,211 @@ print_figures <- function(plot_file, figure_title){
     # dev.off()
 
 }
+
+#' generate data set for testes chronic data
+#'
+#' @param destination where file is located
+#' @param graphNet graphnet target object
+#'
+#' @return
+
+generate_testes_data <- function(destination,  graphNet){
+    #load in data
+
+    testes_data <- readxl::read_xlsx(destination, sheet = 1) |>
+        dplyr::filter(FDR<0.05) |>
+        dplyr::filter(ID %in% V(graphNet)$name)
+return(testes_data)
+}
+
+#' Make testes subnet
+#'
+#' @param testes_data targets object from generate_testes_data
+#' @param graphNet graphnet target object
+#'
+#' @return a testes subgraph
+
+make_testes_subgraph <- function(testes_data, graphNet){
+    connectedSubgraphs <- igraph::all_shortest_paths(
+        graphNet,
+        from = testes_data$ID,
+        to = testes_data$ID,
+        mode = "all")
+
+    connectedSubgraphs <- connectedSubgraphs[["res"]]
+    connectedSubgraphs<- unique(names(unlist(connectedSubgraphs)))
+
+    ontoNetSubgraph <- igraph::induced_subgraph(graphNet, connectedSubgraphs)
+    return(ontoNetSubgraph)
+}
+#make subgraph
+
+
+#' testes clustering
+#'
+#' @param ontoNetSubgraph
+#' @param graphNet background GO network
+#' @param testes_data data frame with GO terms
+#'
+#' @return clustering of testes go terms with direction added
+
+testes_cluster<- function(ontoNetSubgraph, graphNet, testes_data){
+    set.seed(429)
+    ontoClustCommunity <- leidenAlg::find_partition(igraph::as_undirected(ontoNetSubgraph),
+                                                    edge_weights = rep(1, ecount(ontoNetSubgraph)),
+                                                    resolution = .6) +1
+
+
+ontoClust <- tibble::tibble(membership = ontoClustCommunity,
+                            names = igraph::V(ontoNetSubgraph)$name)
+
+clusterTerm <- sapply(unique(ontoClust$membership), function(y){
+
+    y <- ontoClust$names[ontoClust$membership == y]
+
+    ySub <- igraph::induced_subgraph(graphNet, y)
+
+    set.seed(429)
+    yMax <- igraph::centr_eigen(ySub)$vector
+    yTerm <- igraph::V(graphNet)$ontoTerm[match(y[which.max(yMax)],
+                                                igraph::V(graphNet)$name)]
+
+
+    return(yTerm)
+
+})
+
+clusterTerm <- purrr::set_names(clusterTerm, unique(ontoClust$membership))
+
+
+names(clusterTerm) <- unique(ontoClust$membership)
+
+ontoClust <- data.frame(clusterNumber = ontoClust$membership,
+                        clusterTerm = clusterTerm[as.character(ontoClust$membership)],
+                        ontoID = ontoClust$names,
+                        ontoTerm = igraph::V(graphNet)$ontoTerm[match(ontoClust$names,
+                                                                      igraph::V(graphNet)$name)])
+
+cols <- ggsci::pal_igv()(max(ontoClust$clusterNumber))
+set.seed(429)
+cols <- sample(cols, max(ontoClust$clusterNumber), replace = F)
+cols <- cols[ontoClust$clusterNumber]
+ontoClust <- dplyr::mutate(ontoClust, color = cols)
+
+ontoClust <- dplyr::mutate(ontoClust, color = dplyr::case_when(
+    ontoID %in% testes_data$ID ~ color,
+    .default = "#808080"
+))
+
+#add direction
+
+direction <- testes_data |>
+    dplyr::select(ID, Direction)
+
+ontoClust <- dplyr::mutate(ontoClust , order = dplyr::row_number())
+
+joined_clustering <- dplyr::left_join(ontoClust, direction, by = c("ontoID"="ID"))
+
+joined_clustering <- dplyr::mutate(joined_clustering, Direction =
+                                       dplyr::case_when(
+                                           is.na(Direction)~"non-significant",
+                                           .default = Direction
+                                       )) |>
+    dplyr::arrange(order) |>
+    dplyr::select(-order)
+
+return(joined_clustering)
+
+}
+
+#' prepare testes plot
+#'
+#' @param ontoClust clustering result
+#' @param ontoNetSubgraph network for parameter
+#'
+#' @return an annotated plot
+
+prepare_testes_plot <- function(ontoClust, ontoNetSubgraph){
+    add_vertex_attributes <- function(subgraph, clustering_result){
+        igraph::vertex_attr(subgraph) <- list(name = clustering_result$ontoID,
+                                              color = clustering_result$color,
+                                              clusterTerm = clustering_result$clusterTerm,
+                                              label.color = clustering_result$color,
+                                              ontoTerm = clustering_result$ontoTerm)
+        return(subgraph)
+    }
+
+    ontoNetSubgraph <- add_vertex_attributes(ontoNetSubgraph,ontoClust)
+
+    return(ontoNetSubgraph)
+}
+
+#' make testes plot
+#'
+#' @param ontoClust clustering result
+#' @param ontoNetSubgraph network for tissue
+#'
+#' @return a ggplot
+
+make_testes_plot <- function(ontoClust, ontoNetSubgraph, plotName){
+    set.seed(429)
+    color_guides <- dplyr::filter(ontoClust,
+                                  color != "#808080") |>
+                                   dplyr::distinct(color,
+                                                   .keep_all = T) |>
+                                   dplyr::select(color, clusterTerm)
+
+    #some clusters may have no significant targets. They get annotation too
+
+
+    plot_list <- ggraph::ggraph(ontoNetSubgraph, layout = "nicely")+
+                                 ggraph::geom_edge_link0(width = 0.2, colour = "grey") +
+                                 ggraph::geom_node_point(
+                                     aes(fill = ontoClust$clusterTerm,
+                                         color = ontoClust$clusterTerm),
+                                     size = ifelse(ontoClust$color=="#808080", 0,5)
+                                     ,
+                                     shape = dplyr::case_when(
+                                         ontoClust$Direction == "Up"~ 24,
+                                         ontoClust$Direction == "Down"~25,
+                                         .default = 21
+                                     )
+                                 )
+
+    color_mismatch <- dplyr::filter(ontoClust,
+                                    !clusterTerm%in% color_guides$clusterTerm) |>
+                                      dplyr::distinct(clusterTerm, .keep_all = T) |>
+                                      dplyr::select(color, clusterTerm)
+    color_guides <- if(!is.null(color_mismatch)){(dplyr::mutate(color_mismatch, color = "#808080") |>
+                                                       dplyr::rows_append(color_guides))}
+
+
+    plot_list <- plot_list +
+        scale_color_manual(
+            values = color_guides$color,
+            name = "cluster",
+            aesthetics = c("color", "fill")
+        ) +
+        guides(fill = guide_legend(override.aes = list(size = 5,
+                                                       shape = 21))) +
+        #ggraph::theme_graph(base_family = "Arial") +
+        theme(
+            legend.text = element_text(size = 12),
+            panel.background = element_rect(fill =
+                                                'transparent'),
+            panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            plot.background = element_rect(fill =
+                                               'transparent', color = NA),
+            legend.background = element_rect(fill =
+                                                 'transparent')
+        )+
+     ggplot2::ggtitle(plotName) +
+        ggplot2::theme(title = ggplot2::element_text(size  = 14))
+
+    return(plot_list)
+}
+
+
+
 

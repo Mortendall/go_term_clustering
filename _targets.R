@@ -39,7 +39,8 @@ list(
    tar_target(name = clusteringResults_1,
               command = cluster_go_terms(subgraphs_1,
                                          gonetwork,
-                                         go_data_list_1))
+                                         go_data_list_1,
+                                         .6))
    ,
    tar_target(name = annotated_subgraphs_1,
               command =prepare_plot(clusteringResults_1,
@@ -57,7 +58,8 @@ list(
   tar_target(name = clusteringResults_2,
              command = cluster_go_terms(subgraphs_2,
                                         gonetwork,
-                                        go_data_list_2))
+                                        go_data_list_2,
+                                        .6))
   ,
   tar_target(name = annotated_subgraphs_2,
              command =prepare_plot(clusteringResults_2,
@@ -74,7 +76,8 @@ list(
   tar_target(name = clusteringResults_3,
              command = cluster_go_terms(subgraphs_3,
                                         gonetwork,
-                                        go_data_list_3))
+                                        go_data_list_3,
+                                        .6))
   ,
   tar_target(name = annotated_subgraphs_3,
              command =prepare_plot(clusteringResults_3,
@@ -90,6 +93,54 @@ list(
                                      "Acute_cold_TN")),
   tar_target(name = print_plot_3,
              command = print_figures(plots_3,
-                                     "Cold_TN_vs_TN"))
+                                     "Cold_TN_vs_TN")),
+  tar_target(name = testes_data,
+             command = generate_testes_data("data-raw/testes/Biological_Process_testes.xlsx",
+                                            gonetwork)),
+  tar_target(name = testes_subgraph,
+             command = make_testes_subgraph(testes_data,
+                                       gonetwork)),
+  tar_target(name = testes_clustering,
+             command= testes_cluster(testes_subgraph,
+                                        gonetwork,
+                                        testes_data)),
+  tar_target(name = testes_annotated,
+             command = prepare_testes_plot(testes_clustering,
+                                           testes_subgraph)),
+  tar_target(name = testes_plot,
+             command = make_testes_plot(testes_clustering,
+                                        testes_annotated,
+                                        "Testes")),
+  tar_target(name = clusteringResults_1_high_res,
+             command = cluster_go_terms(subgraphs_1,
+                                        gonetwork,
+                                        go_data_list_1,
+                                        .8))
+  ,
+  tar_target(name = annotated_subgraphs_1_high_res,
+             command =prepare_plot(clusteringResults_1_high_res,
+                                   subgraphs_1)),
+  tar_target(name = plots_1_high_res,
+             command = make_plots(clusteringResults_1_high_res,
+                                  annotated_subgraphs_1_high_res)),
+  tar_target(name = print_plot_1_high_res,
+             command = print_figures(plots_1_high_res,
+                                     "Cold_vs_TN high res")),
+  tar_target(name = clusteringResults_2_high_res,
+             command = cluster_go_terms(subgraphs_2,
+                                        gonetwork,
+                                        go_data_list_2,
+                                        .8))
+  ,
+  tar_target(name = annotated_subgraphs_2_high_res,
+             command =prepare_plot(clusteringResults_2_high_res,
+                                   subgraphs_2)),
+  tar_target(name = plots_2_high_res,
+             command = make_plots(clusteringResults_2_high_res,
+                                  annotated_subgraphs_2_high_res)),
+  tar_target(name = print_plot_2_high_res,
+             command = print_figures(plots_2_high_res,
+                                     "Acute_cold_TN high res"))
+
 
 )
