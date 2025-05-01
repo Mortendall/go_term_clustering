@@ -115,7 +115,7 @@ list(
              command = cluster_go_terms(subgraphs_1,
                                         gonetwork,
                                         go_data_list_1,
-                                        .8))
+                                        1.3))
   ,
   tar_target(name = annotated_subgraphs_1_high_res,
              command =prepare_plot(clusteringResults_1_high_res,
@@ -130,7 +130,7 @@ list(
              command = cluster_go_terms(subgraphs_2,
                                         gonetwork,
                                         go_data_list_2,
-                                        .8))
+                                        1.3))
   ,
   tar_target(name = annotated_subgraphs_2_high_res,
              command =prepare_plot(clusteringResults_2_high_res,
