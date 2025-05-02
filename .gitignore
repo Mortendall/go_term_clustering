@@ -7,4 +7,5 @@
 data
 data-raw
 renv
-doc
+doc/README.md
+doc/function_testing.Rmd
